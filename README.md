@@ -1,131 +1,88 @@
-# POS Backend
+# POS System
 
-A high-performance Point of Sale (POS) backend server built with Rust, featuring real-time updates via WebSocket and a robust SQLite database.
+A modern Point of Sale (POS) system built with Go and SQLite, featuring real-time updates and iOS admin interface.
 
 ## Features
 
-- 🚀 High-performance Rust implementation
-- 🔒 Secure authentication and authorization
-- 📱 Real-time updates via WebSocket
-- 🗄️ SQLite database with connection pooling
-- 🔍 Comprehensive input validation
-- 📝 Detailed logging and error handling
-- 🧪 Extensive test coverage
-- 🔄 Automatic mDNS service discovery
-- 💻 Cross-platform compatibility
-
-## Prerequisites
-
-- Rust (2021 edition)
-- Cargo package manager
-- SQLite 3
-
-## Quick Start
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/mannyd209/RUST-POS-Server.git
-   cd pos-backend
-   ```
-
-2. Build the project:
-   ```bash
-   cargo build
-   ```
-
-3. Run the server:
-   ```bash
-   cargo run
-   ```
-
-The server will start on port 8000 by default, and a default admin account will be created:
-- PIN: "1432"
-- Name: "Manny Duarte"
-- Admin: true
+- PIN-based staff authentication
+- Real-time order updates via WebSocket
+- Local network service discovery
+- Catalog management (categories, items, modifiers)
+- Transaction processing and history
+- Discount management
+- iOS admin dashboard
 
 ## Project Structure
 
 ```
 /POS
-├── src/
-│   ├── main.rs           # Application entry point
-│   ├── lib.rs            # Library exports
-│   ├── db/               # Database management
-│   ├── handlers/         # API route handlers
-│   ├── middleware/       # Custom middleware
-│   ├── models/           # Data models
-│   ├── utils/            # Utility functions
-│   └── websocket/        # WebSocket implementation
-└── tests/                # Integration tests
+├── .gitignore              # Git ignore rules
+├── README.md              # Project documentation
+├── Database/             # SQLite database directory
+│   └── pos.db           # Main database file
+└── go-pos/              # Go backend server
+    ├── api/             # API related code
+    │   ├── database/    # Database management
+    │   ├── discovery/   # Network discovery service
+    │   ├── handlers/    # Request handlers
+    │   ├── middleware/  # Middleware components
+    │   └── models/      # Data models
+    ├── config/          # Configuration
+    ├── go.mod          # Go module definition
+    └── main.go         # Application entry point
 ```
 
-## API Endpoints
+## Getting Started
 
-### Health Check
-- GET /health - Server health status
+1. Install Go 1.21 or later
+2. Clone this repository
+3. Navigate to the go-pos directory
+4. Run `go mod download` to install dependencies
+5. Start the server with `go run main.go`
 
-### Staff Management
-- POST /staff/auth - Authenticate staff
-- GET /staff - List all staff
-- POST /staff - Create staff
-- GET /staff/{id} - Get staff details
-- PUT /staff/{id} - Update staff
-- DELETE /staff/{id} - Delete staff
+The server will automatically:
+- Create the SQLite database if it doesn't exist
+- Start broadcasting its presence on the local network
+- Listen for connections on port 8000
 
-### Catalog Management (Admin Only)
-- Categories: CRUD operations at /catalog/categories
-- Items: CRUD operations at /catalog/items
-- Modifiers: CRUD operations at /catalog/modifiers
-- Options: CRUD operations at /catalog/options
-- Discounts: CRUD operations at /catalog/discounts
+## iOS Admin App
 
-## WebSocket Events
+The iOS admin dashboard app will automatically discover the POS server when:
+1. Both devices are on the same local network
+2. The POS server is running
+3. The iOS app is launched
 
-The server broadcasts real-time updates for the following events:
+## API Documentation
 
-### Staff Events
-- STAFF_CREATED
-- STAFF_UPDATED
-- STAFF_DELETED
-
-### Catalog Events
-- CATEGORY_CREATED/UPDATED/DELETED
-- ITEM_CREATED/UPDATED/DELETED
-- MODIFIER_CREATED/UPDATED/DELETED
-- OPTION_CREATED/UPDATED/DELETED
-- DISCOUNT_CREATED/UPDATED/DELETED
+See `documentation.md` in the go-pos directory for complete API documentation.
 
 ## Dependencies
 
-- actix-web (4.3) - Web framework
-- actix-ws (0.2) - WebSocket support
-- rusqlite (0.29) - SQLite database driver
-- r2d2 (0.8) - Connection pooling
-- serde (1.0) - Serialization
-- tokio (1.28) - Async runtime
-- uuid (1.3) - UUID generation
-- mdns-sd (0.10) - mDNS service discovery
+- gorilla/websocket (1.5) - WebSocket support
+- jmoiron/sqlx (1.3) - SQLite database driver
+- google/gopacket (1.20) - Network packet processing
+- go-ole/go-ole (1.2) - Windows OLE automation
+- sirupsen/logrus (1.9) - Logging
 
 ## Development
 
 ### Running Tests
 ```bash
-cargo test
+go test
 ```
 
 ### Running with Logging
 ```bash
-RUST_LOG=debug cargo run
+go run main.go -log-level=debug
 ```
 
 ### Building for Release
 ```bash
-cargo build --release
+go build -o pos-server main.go
 ```
 
 ## Security Features
 
-- Admin authorization middleware
 - PIN-based authentication
 - Input validation on all endpoints
 - Parameterized SQL queries

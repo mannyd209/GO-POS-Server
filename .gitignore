@@ -21,40 +21,21 @@ Database/*.db-journal
 .vscode/
 *.swp
 *.swo
+
+# macOS
 .DS_Store
-Thumbs.db
+.AppleDouble
+.LSOverride
 
-# Logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Go specific
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
 
-# Testing
-coverage/
-
-# TypeScript
-*.tsbuildinfo
-
-# Configuration files
-.windsurfrules
-
-# Temporary files
-*.tmp
-*.temp
-.DS_Store
-
-# Next.js
-.next/
-out/
-
-# Old backup files
-backup/
-
-# Keep Windsurf rules
-!.windsurfrules
-
-# Added by cargo
-
-/target
+# Binary output directory
+bin/
