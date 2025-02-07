@@ -1,0 +1,251 @@
+# POS Backend Architecture and Rules
+
+## Project Structure
+/POS
+├── .gitignore              # Git ignore rules
+├── .windsurfrules         # Development rules and architecture
+├── Cargo.toml             # Rust dependencies and project config
+├── Cargo.lock             # Locked dependencies
+├── README.md             # Project documentation
+├── Database/             # SQLite database directory
+│   └── pos.db           # Main database file
+├── src/
+│   ├── main.rs           # Application entry point
+│   ├── lib.rs            # Library exports
+│   ├── db/               # Database management
+│   │   ├── mod.rs        # Connection pool and types
+│   │   └── migrations.rs # Schema migrations
+│   ├── handlers/         # API route handlers
+│   │   ├── mod.rs        # Handler exports
+│   │   ├── staff.rs      # Staff management
+│   │   ├── catalog.rs    # Catalog management
+│   │   ├── discounts.rs  # Discount management
+│   │   ├── modifiers.rs  # Modifier management
+│   │   └── health.rs     # Health check endpoints
+│   ├── middleware/       # Custom middleware
+│   │   ├── mod.rs        # Middleware exports
+│   │   ├── admin.rs      # Admin authorization
+│   │   ├── auth.rs       # Authentication
+│   │   └── validation.rs # Request validation
+│   ├── models/           # Data models
+│   │   └── mod.rs        # Model definitions and validation
+│   ├── utils/            # Utility functions
+│   │   └── mod.rs        # Utility exports
+│   └── websocket/        # WebSocket handling
+│       └── mod.rs        # WebSocket implementation
+├── tests/                # Integration tests
+│   ├── common.rs         # Shared test utilities
+│   ├── staff_tests.rs    # Staff endpoint tests
+│   └── catalog_tests.rs  # Catalog endpoint tests
+└── backup/              # Old Backup configurations (ignore)
+    ├── .windsurfrules   # Old Backup rules (ignore)
+    ├── package.json     # Old Node.js backup config (ignore)
+    └── tsconfig.json    # Old TypeScript backup config (ignore)
+
+## Database Schema
+- staff
+  - staff_id: TEXT PRIMARY KEY
+  - pin: TEXT NOT NULL
+  - first_name: TEXT NOT NULL
+  - last_name: TEXT NOT NULL
+  - hourly_wage: REAL NOT NULL
+  - is_admin: INTEGER NOT NULL DEFAULT 0
+
+- categories
+  - category_id: TEXT PRIMARY KEY
+  - name: TEXT NOT NULL
+  - sort_order: INTEGER NOT NULL
+
+- items
+  - item_id: TEXT PRIMARY KEY
+  - category_id: TEXT REFERENCES categories(category_id)
+  - name: TEXT NOT NULL
+  - regular_price: REAL NOT NULL
+  - event_price: REAL NOT NULL
+  - sort_order: INTEGER NOT NULL
+  - available: INTEGER NOT NULL DEFAULT 1
+
+- modifiers
+  - modifier_id: TEXT PRIMARY KEY
+  - item_id: TEXT REFERENCES items(item_id)
+  - name: TEXT NOT NULL
+  - single_selection: INTEGER NOT NULL DEFAULT 1
+  - sort_order: INTEGER NOT NULL DEFAULT 0
+
+- options
+  - option_id: TEXT PRIMARY KEY
+  - modifier_id: TEXT REFERENCES modifiers(modifier_id)
+  - name: TEXT NOT NULL
+  - price: REAL NOT NULL
+  - available: INTEGER NOT NULL DEFAULT 1
+  - sort_order: INTEGER NOT NULL DEFAULT 0
+
+- discounts
+  - discount_id: TEXT PRIMARY KEY
+  - name: TEXT NOT NULL
+  - is_percentage: INTEGER NOT NULL DEFAULT 1
+  - amount: REAL NOT NULL
+  - available: INTEGER NOT NULL DEFAULT 1
+  - sort_order: INTEGER NOT NULL DEFAULT 0
+
+## API Endpoints
+
+### Health Check
+GET /health            # Server health status
+
+### Staff Management
+POST /staff/auth         # Authenticate staff
+GET /staff              # List all staff
+POST /staff             # Create staff
+GET /staff/{id}         # Get staff details
+PUT /staff/{id}         # Update staff
+DELETE /staff/{id}      # Delete staff
+
+### Catalog Management (Admin Only)
+Categories:
+  GET /catalog/categories
+  POST /catalog/categories
+  GET /catalog/categories/{id}
+  PUT /catalog/categories/{id}
+  DELETE /catalog/categories/{id}
+
+Items:
+  GET /catalog/items
+  POST /catalog/items
+  GET /catalog/items/{id}
+  PUT /catalog/items/{id}
+  DELETE /catalog/items/{id}
+
+Modifiers:
+  GET /catalog/modifiers
+  POST /catalog/modifiers
+  GET /catalog/modifiers/{id}
+  PUT /catalog/modifiers/{id}
+  DELETE /catalog/modifiers/{id}
+
+Options:
+  GET /catalog/options
+  POST /catalog/options
+  GET /catalog/options/{id}
+  PUT /catalog/options/{id}
+  DELETE /catalog/options/{id}
+
+Discounts:
+  GET /catalog/discounts
+  POST /catalog/discounts
+  GET /catalog/discounts/{id}
+  PUT /catalog/discounts/{id}
+  DELETE /catalog/discounts/{id}
+
+## WebSocket Events
+Staff Events:
+  - STAFF_CREATED
+  - STAFF_UPDATED
+  - STAFF_DELETED
+
+Catalog Events:
+  - CATEGORY_CREATED/UPDATED/DELETED
+  - ITEM_CREATED/UPDATED/DELETED
+  - MODIFIER_CREATED/UPDATED/DELETED
+  - OPTION_CREATED/UPDATED/DELETED
+  - DISCOUNT_CREATED/UPDATED/DELETED
+
+## Development Rules
+
+### 1. Code Organization
+- Keep modules focused and single-responsibility
+- Use the ValidatedJson trait for all input validation
+- Implement proper error handling with ApiError
+- Follow Rust naming conventions
+- Utilize utility functions for common operations
+
+### 2. Security
+- All catalog endpoints must be admin-protected
+- Use proper input validation for all requests
+- Never store sensitive data in plain text
+- Always check authorization before operations
+- Use parameterized queries for database operations
+- Implement rate limiting for authentication attempts
+
+### 3. Database
+- Use connection pooling for efficiency
+- Check affected rows in update/delete operations
+- Maintain proper foreign key relationships
+- Use transactions for multi-table operations
+- Regular database backups
+- Implement database migrations properly
+
+### 4. Testing
+- Write tests for all new endpoints
+- Include both success and failure cases
+- Test authorization and validation
+- Use test utilities from common.rs
+- Maintain high test coverage
+- Test WebSocket functionality
+
+### 5. WebSocket
+- Broadcast all state changes
+- Keep messages small and focused
+- Handle connection errors gracefully
+- Document all event types
+- Implement reconnection logic
+- Monitor connection health
+
+### 6. Error Handling
+- Use ApiError for consistent responses
+- Include helpful error messages
+- Log errors appropriately
+- Handle all Result types
+- Proper error propagation
+- Implement custom error types when needed
+
+### 7. Performance
+- Use connection pooling
+- Keep WebSocket messages minimal
+- Index frequently queried fields
+- Use async/await appropriately
+- Monitor resource usage
+- Implement caching where appropriate
+
+## Default Configuration
+- Server Port: 8000
+- Database: SQLite (Database/pos.db)
+- Default Admin:
+  - PIN: "1432"
+  - Name: "Manny Duarte"
+  - Wage: 30.00
+  - Admin: true
+
+## Deployment Checklist
+1. Build release version
+2. Configure environment variables
+3. Set up logging
+4. Configure database backup
+5. Monitor system resources
+6. Set up health checks
+7. Configure CORS properly
+8. Enable WebSocket secure mode
+9. Set up proper error reporting
+10. Configure rate limiting
+11. Set up database migrations
+12. Configure backup retention
+
+## Git Workflow
+1. Create feature branch
+2. Write tests
+3. Implement feature
+4. Run all tests
+5. Create pull request
+6. Code review
+7. Squash and merge
+8. Tag release
+9. Update documentation
+
+## Documentation Requirements
+1. Update API documentation
+2. Document WebSocket events
+3. Update README.md
+4. Document configuration options
+5. Maintain CHANGELOG.md
+6. Document database schema changes
+7. Update deployment guides
