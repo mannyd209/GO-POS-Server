@@ -8,15 +8,13 @@ import (
 type Config struct {
 	Port     string
 	DBPath   string
-	JWTKey   string
 	AppEnv   string
 }
 
-func New() *Config {
+func LoadConfig() *Config {
 	return &Config{
 		Port:     getEnv("PORT", "8000"),
 		DBPath:   getEnv("DB_PATH", filepath.Join("Database", "pos.db")),
-		JWTKey:   getEnv("JWT_KEY", "your-secret-key"),
 		AppEnv:   getEnv("APP_ENV", "development"),
 	}
 }

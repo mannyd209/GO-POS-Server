@@ -1,6 +1,14 @@
 # POS Server (Go + Fiber)
 
-A modern Point of Sale backend server built with Go and Fiber framework.
+A modern Point of Sale backend server built with Go and Fiber framework, featuring automatic service discovery, persistent data storage, and real-time updates.
+
+## Features
+- **Service Discovery**: Automatic server discovery using Zeroconf/mDNS
+- **Persistent Storage**: SQLite database with full ACID compliance
+- **Real-time Updates**: WebSocket support for live transaction updates
+- **Transaction Analytics**: Daily transaction summaries and reports
+- **Session Management**: Secure session-based authentication
+- **RESTful API**: Complete API for all POS operations
 
 ## Project Structure
 ```
@@ -9,7 +17,9 @@ A modern Point of Sale backend server built with Go and Fiber framework.
 │   ├── handlers/     # HTTP request handlers
 │   ├── middleware/   # Custom middleware functions
 │   ├── models/       # Data models and database schemas
-│   └── database/     # Database connection and migrations
+│   ├── database/     # Database connection and migrations
+│   └── discovery/    # Service discovery implementation
+├── Database/        # SQLite database storage
 ├── config/          # Application configuration
 ├── utils/           # Utility functions and helpers
 ├── main.go         # Application entry point
@@ -27,15 +37,54 @@ A modern Point of Sale backend server built with Go and Fiber framework.
 go mod download
 ```
 
-2. Run the server:
+2. Create database directory:
+```bash
+mkdir -p Database
+```
+
+3. Run the server:
 ```bash
 go run main.go
 ```
 
-The server will start on port 3000 by default.
+The server will start on port 8000 by default and will be discoverable on your local network as `_pos-server._tcp.local.`
 
 ## Environment Variables
-- `PORT`: Server port (default: 3000)
+- `PORT`: Server port (default: 8000)
 - `DB_PATH`: SQLite database path (default: Database/pos.db)
-- `JWT_KEY`: JWT signing key for authentication
 - `APP_ENV`: Application environment (development/production)
+
+## Key Endpoints
+
+### Authentication
+```
+POST /staff/auth
+```
+
+### Transactions
+```
+POST /transactions           # Create transaction
+GET /transactions           # List transactions by date
+GET /transactions/summary   # Get daily transaction summary
+PUT /transactions/:id/refund # Refund transaction
+```
+
+### Real-time Updates
+```
+WS /ws/transactions        # WebSocket for live updates
+```
+
+## Development
+
+### Running Tests
+```bash
+go test ./...
+```
+
+### Building for Production
+```bash
+go build -o pos-server
+```
+
+## Documentation
+For detailed API documentation and implementation details, see [documentation.md](documentation.md).

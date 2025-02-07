@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
-
-	"pos-server/api/database"
+	"go-pos/api/database"
 )
 
 type Transaction struct {
@@ -52,6 +51,19 @@ type TransactionDiscount struct {
 	DiscountID           string   `json:"discount_id"`
 	Discount             Discount `json:"discount"`
 	Amount               float64  `json:"amount"`
+}
+
+type TransactionSummary struct {
+	TotalTransactions     int     `json:"total_transactions"`
+	TotalCashSales       float64 `json:"total_cash_sales"`
+	TotalCardSales       float64 `json:"total_card_sales"`
+	TotalTax             float64 `json:"total_tax"`
+	TotalTips            float64 `json:"total_tips"`
+	TotalDiscounts       float64 `json:"total_discounts"`
+	TotalCardTransactions int     `json:"total_card_transactions"`
+	TotalCashTransactions int     `json:"total_cash_transactions"`
+	TotalGrossSales      float64 `json:"total_gross_sales"`
+	TotalNetSales        float64 `json:"total_net_sales"`
 }
 
 // generateSaleID generates a unique sale ID in the format "sale" + 6 random digits
@@ -339,6 +351,49 @@ func GetTransactionsByDateRange(startDate, endDate time.Time) ([]Transaction, er
 	}
 
 	return transactions, nil
+}
+
+func GetTransactionSummary(startDate, endDate time.Time) (*TransactionSummary, error) {
+	query := `
+		SELECT 
+			COUNT(*) as total_transactions,
+			SUM(CASE WHEN payment_method = 'cash' THEN total_amount ELSE 0 END) as total_cash_sales,
+			SUM(CASE WHEN payment_method != 'cash' THEN total_amount ELSE 0 END) as total_card_sales,
+			SUM(tax_amount) as total_tax,
+			SUM(tip_amount) as total_tips,
+			COUNT(CASE WHEN payment_method = 'cash' THEN 1 END) as total_cash_transactions,
+			COUNT(CASE WHEN payment_method != 'cash' THEN 1 END) as total_card_transactions,
+			SUM(total_amount) as total_gross_sales,
+			SUM(subtotal) as total_net_sales,
+			COALESCE((
+				SELECT SUM(d.amount)
+				FROM transaction_discounts td
+				JOIN transactions t2 ON td.sale_id = t2.sale_id
+				JOIN discounts d ON td.discount_id = d.discount_id
+				WHERE t2.created_at >= ? AND t2.created_at < ?
+			), 0) as total_discounts
+		FROM transactions
+		WHERE created_at >= ? AND created_at < ?
+	`
+
+	summary := &TransactionSummary{}
+	err := database.DB.QueryRow(query, startDate, endDate, startDate, endDate).Scan(
+		&summary.TotalTransactions,
+		&summary.TotalCashSales,
+		&summary.TotalCardSales,
+		&summary.TotalTax,
+		&summary.TotalTips,
+		&summary.TotalCashTransactions,
+		&summary.TotalCardTransactions,
+		&summary.TotalGrossSales,
+		&summary.TotalNetSales,
+		&summary.TotalDiscounts,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return summary, nil
 }
 
 // loadItems loads all items for a transaction

@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"pos-server/api/middleware"
-	"pos-server/api/models"
+	"go-pos/api/middleware"
+	"go-pos/api/models"
 	"github.com/gofiber/fiber/v2"
 )
 

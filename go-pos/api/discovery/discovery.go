@@ -75,8 +75,10 @@ func (s *Server) Start() error {
 // Stop stops broadcasting the service
 func (s *Server) Stop() {
 	if s.server != nil {
+		log.Printf("Stopping Zeroconf server...")
 		s.server.Shutdown()
-		log.Println("Stopped broadcasting POS service")
+		s.server = nil
+		log.Printf("Zeroconf server stopped")
 	}
 }
 
@@ -127,4 +129,43 @@ func Browse(ctx context.Context) ([]string, error) {
 	}
 
 	return servers, nil
+}
+
+// Global instance
+var (
+	globalServer *Server
+	initialized  bool
+)
+
+// StartDiscoveryService initializes and starts the discovery service
+func StartDiscoveryService() {
+	if initialized {
+		log.Printf("Discovery service already initialized, skipping...")
+		return
+	}
+	
+	log.Printf("Initializing discovery service...")
+	globalServer = NewServer(8000)
+	if err := globalServer.Start(); err != nil {
+		log.Printf("Warning: Failed to start discovery service: %v", err)
+		globalServer = nil
+		return
+	}
+	
+	initialized = true
+	log.Printf("Discovery service started successfully")
+	
+	// Handle shutdown in a separate goroutine
+	go func() {
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		<-sigChan
+		
+		log.Printf("Shutting down discovery service...")
+		if globalServer != nil {
+			globalServer.Stop()
+			globalServer = nil
+			initialized = false
+		}
+	}()
 }

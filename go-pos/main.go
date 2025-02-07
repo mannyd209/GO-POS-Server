@@ -9,10 +9,14 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/mannyd209/RUST-POS-Server/api/database"
-	"github.com/mannyd209/RUST-POS-Server/api/discovery"
-	"github.com/mannyd209/RUST-POS-Server/api/handlers"
-	"github.com/mannyd209/RUST-POS-Server/config"
+	"github.com/gofiber/fiber/v2/middleware/session"
+	"go-pos/api/database"
+	"go-pos/api/discovery"
+	"go-pos/api/handlers"
+	"go-pos/api/middleware"
+	"go-pos/api/models"
+	"go-pos/config"
+	"github.com/gofiber/websocket/v2"
 )
 
 func createDefaultData() error {
@@ -450,6 +454,7 @@ func setupRoutes(app *fiber.App) {
 	app.Post("/transactions", handlers.CreateTransaction)
 	app.Get("/transactions", handlers.GetTransactionsByDate)
 	app.Get("/transactions/range", handlers.GetTransactionsByDateRange)
+	app.Get("/transactions/summary", handlers.GetTransactionSummary)
 	app.Put("/transactions/:sale_id/refund", handlers.RefundTransaction)
 
 	// WebSocket endpoint for real-time updates
@@ -480,61 +485,58 @@ func setupRoutes(app *fiber.App) {
 
 func main() {
 	// Load configuration
-	cfg := config.New()
+	cfg := config.LoadConfig()
 
 	// Initialize database
 	if err := database.InitDB(cfg.DBPath); err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to initialize database: %v", err)
 	}
-	defer database.DB.Close()
 
-	// Create new Fiber instance
+	// Initialize session store
+	store := session.New()
+	middleware.InitStore(store)
+
+	// Create Fiber app
 	app := fiber.New()
 
-	// Enable CORS for all routes
-	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "*",
-		AllowMethods:     "GET,POST,PUT,DELETE",
-		AllowHeaders:     "Origin, Content-Type, Accept",
-		AllowCredentials: true,
-	}))
+	// Enable CORS
+	app.Use(cors.New())
 
 	// Setup routes
-	handlers.SetupRoutes(app)
+	setupRoutes(app)
 
-	// Create discovery server
-	discoveryServer := discovery.NewServer(8000)
-	if err := discoveryServer.Start(); err != nil {
-		log.Printf("Warning: Failed to start discovery server: %v", err)
-	}
-	defer discoveryServer.Stop()
+	// Start discovery service
+	discovery.StartDiscoveryService()
 
-	// Check if database is empty and create default data if needed
-	isEmpty, err := isDatabaseEmpty()
+	// Create default data if database is empty
+	empty, err := isDatabaseEmpty()
 	if err != nil {
 		log.Printf("Error checking if database is empty: %v", err)
-	} else if isEmpty {
-		log.Println("Creating default data...")
+	} else if empty {
 		if err := createDefaultData(); err != nil {
 			log.Printf("Error creating default data: %v", err)
 		}
-	} else {
-		log.Println("Database already contains data, skipping default data creation")
 	}
 
-	// Handle graceful shutdown
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-
+	// Start server
 	go func() {
-		<-c
-		log.Println("Gracefully shutting down...")
-		_ = app.Shutdown()
+		if err := app.Listen(":8000"); err != nil {
+			log.Fatalf("Failed to start server: %v", err)
+		}
 	}()
 
-	// Start server
-	log.Printf("Server starting on :8000")
-	if err := app.Listen(":8000"); err != nil {
-		log.Fatal(err)
+	// Wait for interrupt signal to gracefully shutdown the server
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shutting down server...")
+	
+	// Shutdown discovery service first (it will handle its own cleanup)
+	discovery.StartDiscoveryService() // This is a no-op if already running
+	
+	// Then shutdown the HTTP server
+	if err := app.Shutdown(); err != nil {
+		log.Printf("Error shutting down server: %v", err)
 	}
 }

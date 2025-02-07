@@ -3,9 +3,8 @@ package handlers
 import (
 	"net/http"
 	"time"
-
+	"go-pos/api/models"
 	"github.com/gofiber/fiber/v2"
-	"pos-server/api/models"
 )
 
 // CreateTransaction creates a new transaction
@@ -119,6 +118,34 @@ func GetTransactionsByDateRange(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(transactions)
+}
+
+// GetTransactionSummary returns a summary of transactions for a specific date
+func GetTransactionSummary(c *fiber.Ctx) error {
+	dateStr := c.Query("date")
+	if dateStr == "" {
+		dateStr = time.Now().Format("2006-01-02")
+	}
+
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid date format. Use YYYY-MM-DD",
+		})
+	}
+
+	// Set time range for the entire day
+	startDate := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.Local)
+	endDate := startDate.Add(24 * time.Hour)
+
+	summary, err := models.GetTransactionSummary(startDate, endDate)
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get transaction summary",
+		})
+	}
+
+	return c.JSON(summary)
 }
 
 // RefundTransaction marks a transaction as refunded

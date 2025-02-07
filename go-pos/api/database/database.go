@@ -12,28 +12,26 @@ import (
 
 var DB *sql.DB
 
-func InitDB(dbPath string) {
-	// Remove existing database if it exists
-	os.Remove(dbPath)
-
+func InitDB(dbPath string) error {
 	// Ensure database directory exists
 	dbDir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dbDir, 0755); err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to create database directory: %v", err)
 	}
 
 	var err error
 	DB, err = sql.Open("sqlite3", dbPath)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to open database: %v", err)
 	}
 
 	if err = DB.Ping(); err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to ping database: %v", err)
 	}
 
 	fmt.Println("Connected to database:", dbPath)
 	createTables()
+	return nil
 }
 
 func createTables() {

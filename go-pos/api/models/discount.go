@@ -3,8 +3,8 @@ package models
 import (
 	"database/sql"
 	"errors"
-	"pos-server/api/database"
-	"pos-server/api/utils"
+	"go-pos/api/database"
+	"go-pos/api/utils"
 )
 
 type Discount struct {
