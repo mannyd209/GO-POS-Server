@@ -87,4 +87,4 @@ go build -o pos-server
 ```
 
 ## Documentation
-For detailed API documentation and implementation details, see [go-pos/documentation.md](documentation.md).
+For detailed API documentation and implementation details, see [GO-POS-Server/go-pos/documentation.md](documentation.md).
