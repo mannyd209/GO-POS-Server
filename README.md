@@ -24,7 +24,7 @@ A high-performance Point of Sale (POS) backend server built with Rust, featuring
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/pos-backend.git
+   git clone https://github.com/mannyd209/RUST-POS-Server.git
    cd pos-backend
    ```
 
