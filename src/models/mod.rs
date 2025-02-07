@@ -1,131 +1,126 @@
-use actix_web::{http::StatusCode, HttpResponse, ResponseError};
+use actix_web::{http::StatusCode, HttpResponse, ResponseError, web::Json};
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use validator::Validate;
-use thiserror::Error;
+use validator::{Validate, ValidationErrors};
 
-#[derive(Debug, Serialize, Deserialize, Validate)]
+#[derive(Debug, Serialize, Deserialize, Clone, Validate)]
 pub struct Staff {
+    #[validate(length(min = 1, max = 50))]
     pub staff_id: String,
-    #[validate(length(min = 4, max = 4, message = "PIN must be exactly 4 characters"))]
-    #[validate(regex(path = "regex::Regex::new(r\"^[0-9]{4}$\").unwrap()", message = "PIN must be 4 digits"))]
+    #[validate(length(min = 4))]
     pub pin: String,
-    #[validate(length(min = 1, message = "First name cannot be empty"))]
+    #[validate(length(min = 1, max = 50))]
     pub first_name: String,
-    #[validate(length(min = 1, message = "Last name cannot be empty"))]
+    #[validate(length(min = 1, max = 50))]
     pub last_name: String,
-    #[validate(range(min = 0.0, message = "Hourly wage must be non-negative"))]
+    #[validate(range(min = 0.0))]
     pub hourly_wage: f64,
     pub is_admin: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Validate)]
+#[derive(Debug, Serialize, Deserialize, Clone, Validate)]
+pub struct StaffCredentials {
+    #[validate(length(min = 1, max = 50))]
+    pub staff_id: String,
+    #[validate(length(min = 4))]
+    pub pin: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Validate)]
 pub struct Category {
     pub category_id: String,
-    #[validate(length(min = 1, message = "Name cannot be empty"))]
+    #[validate(length(min = 1))]
     pub name: String,
-    #[validate(range(min = 0, message = "Sort order must be non-negative"))]
     pub sort_order: i32,
 }
 
-#[derive(Debug, Serialize, Deserialize, Validate)]
+#[derive(Debug, Serialize, Deserialize, Clone, Validate)]
 pub struct Item {
     pub item_id: String,
     pub category_id: String,
-    #[validate(length(min = 1, message = "Name cannot be empty"))]
+    #[validate(length(min = 1))]
     pub name: String,
-    #[validate(range(min = 0.0, message = "Regular price must be non-negative"))]
+    #[validate(range(min = 0.0))]
     pub regular_price: f64,
-    #[validate(range(min = 0.0, message = "Event price must be non-negative"))]
+    #[validate(range(min = 0.0))]
     pub event_price: f64,
-    #[validate(range(min = 0, message = "Sort order must be non-negative"))]
     pub sort_order: i32,
     pub available: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Validate)]
+#[derive(Debug, Serialize, Deserialize, Clone, Validate)]
 pub struct Modifier {
     pub modifier_id: String,
     pub item_id: String,
-    #[validate(length(min = 1, message = "Name cannot be empty"))]
+    #[validate(length(min = 1))]
     pub name: String,
     pub single_selection: bool,
-    #[validate(range(min = 0, message = "Sort order must be non-negative"))]
     pub sort_order: i32,
 }
 
-#[derive(Debug, Serialize, Deserialize, Validate)]
+#[derive(Debug, Serialize, Deserialize, Clone, Validate)]
 pub struct Option {
     pub option_id: String,
     pub modifier_id: String,
-    #[validate(length(min = 1, message = "Name cannot be empty"))]
+    #[validate(length(min = 1))]
     pub name: String,
-    #[validate(range(min = 0.0, message = "Price must be non-negative"))]
+    #[validate(range(min = 0.0))]
     pub price: f64,
     pub available: bool,
-    #[validate(range(min = 0, message = "Sort order must be non-negative"))]
     pub sort_order: i32,
 }
 
-#[derive(Debug, Serialize, Deserialize, Validate)]
+#[derive(Debug, Serialize, Deserialize, Clone, Validate)]
 pub struct Discount {
     pub discount_id: String,
-    #[validate(length(min = 1, message = "Name cannot be empty"))]
+    #[validate(length(min = 1))]
     pub name: String,
     pub is_percentage: bool,
-    #[validate(custom = "validate_discount_amount")]
+    #[validate(range(min = 0.0))]
     pub amount: f64,
     pub available: bool,
-    #[validate(range(min = 0, message = "Sort order must be non-negative"))]
     pub sort_order: i32,
-}
-
-fn validate_discount_amount(amount: f64) -> Result<(), validator::ValidationError> {
-    if amount < 0.0 {
-        return Err(validator::ValidationError::new("Amount must be non-negative"));
-    }
-    
-    Ok(())
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum ApiError {
     #[error("Database error: {0}")]
     DatabaseError(String),
-    
     #[error("Not found: {0}")]
     NotFound(String),
-    
     #[error("Validation error: {0}")]
-    ValidationError(#[from] validator::ValidationErrors),
-    
+    ValidationError(String),
     #[error("Unauthorized: {0}")]
     Unauthorized(String),
-    
     #[error("Bad request: {0}")]
     BadRequest(String),
 }
 
-impl fmt::Display for ApiError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ApiError::DatabaseError(msg) => write!(f, "Database error: {}", msg),
-            ApiError::NotFound(msg) => write!(f, "Not found: {}", msg),
-            ApiError::ValidationError(msg) => write!(f, "Validation error: {}", msg),
-            ApiError::Unauthorized(msg) => write!(f, "Unauthorized: {}", msg),
-            ApiError::BadRequest(msg) => write!(f, "Bad request: {}", msg),
-        }
+impl From<rusqlite::Error> for ApiError {
+    fn from(err: rusqlite::Error) -> Self {
+        ApiError::DatabaseError(err.to_string())
+    }
+}
+
+impl From<r2d2::Error> for ApiError {
+    fn from(err: r2d2::Error) -> Self {
+        ApiError::DatabaseError(err.to_string())
+    }
+}
+
+impl From<ValidationErrors> for ApiError {
+    fn from(errors: ValidationErrors) -> Self {
+        ApiError::ValidationError(errors.to_string())
     }
 }
 
 impl ResponseError for ApiError {
     fn error_response(&self) -> HttpResponse {
         let (status, message) = match self {
-            ApiError::DatabaseError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
-            ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
-            ApiError::ValidationError(msg) => (StatusCode::BAD_REQUEST, msg),
-            ApiError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),
-            ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
+            ApiError::DatabaseError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.to_string()),
+            ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.to_string()),
+            ApiError::ValidationError(msg) => (StatusCode::BAD_REQUEST, msg.to_string()),
+            ApiError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg.to_string()),
+            ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.to_string()),
         };
 
         HttpResponse::build(status).json(serde_json::json!({
@@ -141,18 +136,6 @@ impl ResponseError for ApiError {
             ApiError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             ApiError::BadRequest(_) => StatusCode::BAD_REQUEST,
         }
-    }
-}
-
-impl From<r2d2::Error> for ApiError {
-    fn from(err: r2d2::Error) -> Self {
-        ApiError::DatabaseError(err.to_string())
-    }
-}
-
-impl From<rusqlite::Error> for ApiError {
-    fn from(err: rusqlite::Error) -> Self {
-        ApiError::DatabaseError(err.to_string())
     }
 }
 
@@ -178,26 +161,26 @@ pub enum WsMessage {
     DiscountDeleted(String),
 }
 
-#[derive(Debug, Serialize, Deserialize, Validate)]
+pub trait ValidatedJson<T> {
+    fn validate(self) -> Result<T, ApiError>;
+}
+
+impl<T: Validate> ValidatedJson<T> for Json<T> {
+    fn validate(self) -> Result<T, ApiError> {
+        let data = self.into_inner();
+        data.validate()?;
+        Ok(data)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Validate)]
 pub struct AuthRequest {
     #[validate(length(min = 4))]
     pub pin: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AuthResponse {
     pub staff_id: String,
     pub is_admin: bool,
-}
-
-pub trait ValidatedJson<T>: Sized {
-    fn validate(self) -> Result<T, ApiError>;
-}
-
-impl<T: Validate> ValidatedJson<T> for actix_web::web::Json<T> {
-    fn validate(self) -> Result<T, ApiError> {
-        let inner = self.into_inner();
-        inner.validate()?;
-        Ok(inner)
-    }
 }

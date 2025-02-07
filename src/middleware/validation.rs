@@ -1,36 +1,60 @@
-use std::future::{ready, Ready};
-use actix_web::{dev::Payload, FromRequest, HttpRequest};
-use serde::de::DeserializeOwned;
-use validator::Validate;
+use actix_web::{
+    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
+    Error,
+};
+use futures_util::future::{ready, Ready, LocalBoxFuture};
 
-use crate::models::ApiError;
+pub struct ValidateRequest<T> {
+    _marker: std::marker::PhantomData<T>,
+}
 
-#[derive(Debug)]
-pub struct ValidatedJson<T>(pub T);
-
-impl<T> ValidatedJson<T> {
-    pub fn into_inner(self) -> T {
-        self.0
+impl<T> Default for ValidateRequest<T> {
+    fn default() -> Self {
+        Self {
+            _marker: std::marker::PhantomData,
+        }
     }
 }
 
-impl<T> FromRequest for ValidatedJson<T>
+impl<S, B> Transform<S, ServiceRequest> for ValidateRequest<S>
 where
-    T: DeserializeOwned + Validate,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static + Clone,
+    B: 'static,
 {
-    type Error = ApiError;
-    type Future = Ready<Result<Self, Self::Error>>;
+    type Response = ServiceResponse<B>;
+    type Error = Error;
+    type InitError = ();
+    type Transform = ValidateRequestMiddleware<S>;
+    type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
-    fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
-        let json_result = match actix_web::web::Json::<T>::from_request(req, payload).into_inner() {
-            Ok(json) => json,
-            Err(e) => return ready(Err(ApiError::BadRequest(format!("JSON parsing error: {}", e)))),
-        };
+    fn new_transform(&self, service: S) -> Self::Future {
+        ready(Ok(ValidateRequestMiddleware {
+            service,
+            _marker: std::marker::PhantomData,
+        }))
+    }
+}
 
-        let data = json_result.0;
-        ready(match data.validate() {
-            Ok(_) => Ok(ValidatedJson(data)),
-            Err(e) => Err(ApiError::BadRequest(format!("Validation error: {}", e))),
+pub struct ValidateRequestMiddleware<S> {
+    service: S,
+    _marker: std::marker::PhantomData<S>,
+}
+
+impl<S, B> Service<ServiceRequest> for ValidateRequestMiddleware<S>
+where
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static + Clone,
+    B: 'static,
+{
+    type Response = ServiceResponse<B>;
+    type Error = Error;
+    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    forward_ready!(service);
+
+    fn call(&self, req: ServiceRequest) -> Self::Future {
+        let service = self.service.clone();
+        Box::pin(async move {
+            service.call(req).await
         })
     }
 }

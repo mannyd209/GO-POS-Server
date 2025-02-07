@@ -1,17 +1,15 @@
 use actix_web::{
-    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    error::ErrorUnauthorized,
-    http::header,
-    Error,
+    dev::{Service, ServiceRequest, ServiceResponse, Transform},
+    Error, HttpMessage,
 };
-use futures_util::future::LocalBoxFuture;
-use std::{
-    future::{ready, Ready},
-    rc::Rc,
-};
+use futures_util::future::{ok, Ready};
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
-use crate::db::DbPool;
+use crate::models::ApiError;
 
+#[derive(Clone)]
 pub struct AdminAuth;
 
 impl AdminAuth {
@@ -22,7 +20,7 @@ impl AdminAuth {
 
 impl<S, B> Transform<S, ServiceRequest> for AdminAuth
 where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
 {
@@ -33,60 +31,41 @@ where
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ready(Ok(AdminAuthMiddleware {
-            service: Rc::new(service),
-        }))
+        ok(AdminAuthMiddleware { service })
     }
 }
 
 pub struct AdminAuthMiddleware<S> {
-    service: Rc<S>,
+    service: S,
 }
 
 impl<S, B> Service<ServiceRequest> for AdminAuthMiddleware<S>
 where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
 {
     type Response = ServiceResponse<B>;
     type Error = Error;
-    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
-    forward_ready!(service);
+    fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.service.poll_ready(cx)
+    }
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        let service = self.service.clone();
+        // Get staff claims from request extensions
+        let is_admin = req.extensions().get::<bool>().copied().unwrap_or(false);
+        if is_admin {
+            let fut = self.service.call(req);
+            return Box::pin(async move {
+                let res = fut.await?;
+                Ok(res)
+            });
+        }
 
         Box::pin(async move {
-            // Extract the authorization header
-            let auth_header = req
-                .headers()
-                .get(header::AUTHORIZATION)
-                .and_then(|h| h.to_str().ok())
-                .and_then(|h| h.strip_prefix("Bearer "));
-
-            let pool = req.app_data::<actix_web::web::Data<DbPool>>().unwrap();
-
-            if let Some(pin) = auth_header {
-                // Check if the PIN belongs to an admin
-                let conn = pool.get().map_err(|e| ErrorUnauthorized(e.to_string()))?;
-                let is_admin: bool = conn
-                    .query_row(
-                        "SELECT is_admin FROM staff WHERE pin = ?1",
-                        [pin],
-                        |row| row.get::<_, i32>(0),
-                    )
-                    .map(|val| val != 0)
-                    .unwrap_or(false);
-
-                if is_admin {
-                    let res = service.call(req).await?;
-                    return Ok(res);
-                }
-            }
-
-            Err(ErrorUnauthorized("Admin access required"))
+            Err(Error::from(ApiError::Unauthorized("Admin access required".to_string())))
         })
     }
 }
