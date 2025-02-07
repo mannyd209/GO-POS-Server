@@ -4,6 +4,7 @@
 *.dll
 *.so
 *.dylib
+pos-server
 
 # Test binary, built with `go test -c`
 *.test
@@ -17,17 +18,26 @@
 # Go workspace file
 go.work
 
-# Environment variables
+# Environment variables and configuration
 .env
+.env.*
+*.config
+config.yaml
+config.yml
 
-# Database
-Database/*.db
+# Database and data files
+Database/
+*.db
+*.sqlite
+*.sqlite3
 
 # IDE specific files
 .idea/
 .vscode/
 *.swp
 *.swo
+*.sublime-workspace
+*.sublime-project
 
 # OS generated files
 .DS_Store
@@ -37,3 +47,26 @@ Database/*.db
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+tmp/
+log/
+logs/
+
+# Personal and sensitive files
+.windsurfrules
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+*.keystore
+secrets/
+
+# Keep these files
+!README.md
+!documentation.md
+!LICENSE
