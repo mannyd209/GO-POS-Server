@@ -213,6 +213,12 @@ CREATE TABLE transaction_discounts (
 
 ## API Endpoints
 
+### Authentication
+- `POST /staff/auth` - Authenticate staff member
+  - Body: `{ "pin": "string" }`
+  - Returns: Staff object with session token
+  - Error: 401 if invalid PIN
+
 ### Staff Management
 - `GET /staff` - List all staff
   - Returns: Array of staff members

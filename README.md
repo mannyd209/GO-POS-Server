@@ -57,8 +57,16 @@ The server will start on port 8000 by default and will be discoverable on your l
 ## Key Endpoints
 
 ### Authentication
-```
-POST /staff/auth
+The server uses PIN-based authentication for staff members. On first run, it creates a default admin account:
+- Name: Manny
+- PIN: 0000
+- Role: Admin
+
+To authenticate:
+```bash
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"pin":"0000"}' \
+  http://localhost:8000/staff/auth
 ```
 
 ### Transactions
@@ -86,5 +94,5 @@ go test ./...
 go build -o pos-server
 ```
 
-## Documentation
-For detailed API documentation and implementation details, see [documentation.md](go-pos/documentation.md).
+## API Documentation
+For detailed API documentation, see [documentation.md](documentation.md)
